@@ -6,22 +6,26 @@
 #+PROPERTY: repo obsidian-org-mode
 
 * Findings
-** TODO [#A] Guard token bounds in checkbox handler [:BUG:]
+** DONE [#A] Guard token bounds in checkbox handler [:BUG:]
+   CLOSED: [2025-11-16]
    - File :: src/mode/orgmode/orgmode-mode.js:259
    - Issue :: `_toggleCheckbox` assumes `token.start`/`token.end` are finite and that the token length matches the current checkbox string. Clicking near the gutter or on malformed `[ ]` tokens can yield `undefined` positions, causing `getRange`/`replaceRange` to throw.
    - Fix :: Validate the token bounds before manipulating the range; bail early if they are not numeric.
    - ROI :: Prevents editor crashes during common checkbox edits with a minimal guard.
-** TODO [#B] Keep checkbox state synchronized with TODO keyword [:CONSISTENCY:]
+** DONE [#B] Keep checkbox state synchronized with TODO keyword [:CONSISTENCY:]
+   CLOSED: [2025-11-16]
    - File :: src/mode/orgmode/orgmode-mode.js:262
    - Issue :: Cycling TODO/DONE keywords via `_toggleTodo` or `_toggleDone` leaves any adjacent checkbox untouched, producing divergent states (e.g., keyword “DONE” with `[ ]`).
    - Fix :: When toggling the keyword, also update the checkbox on the same line (if present) to reflect completion state.
    - ROI :: Aligns two high-visibility task indicators and eliminates user confusion long-term.
-** TODO [#C] Remove global RegExp capture in image toggle [:BUG:]
+** DONE [#C] Remove global RegExp capture in image toggle [:BUG:]
+   CLOSED: [2025-11-16]
    - File :: src/mode/orgmode/orgmode-mode.js:373
    - Issue :: `_toggleImageWidget` still relies on `RegExp.$1` after calling `token.string.match(...)`. If the match fails, `$1` retains the previous capture, so a second image click might render the wrong asset.
    - Fix :: Store the match result and extract `match[1]` locally, mirroring the `_navigateLink` fix.
    - ROI :: Simple refactor that prevents incorrect image previews for the lifetime of the feature.
-** TODO [#D] Restore global touch flag after tests [:TEST:]
+** DONE [#D] Restore global touch flag after tests [:TEST:]
+   CLOSED: [2025-11-16]
    - File :: tests/orgmode-smoke.test.js:422
    - Issue :: The touch-event test mutates `global.window.ontouchstart` without ensuring restoration when an assertion fails mid-test, leaking the flag to later tests.
    - Fix :: Snapshot `global.window.ontouchstart` and restore it in a `finally` block.
