@@ -1,0 +1,24 @@
+#+TITLE: Code Review Retrospective
+#+DATE: 2025-11-16
+#+AUTHOR: Codex (GPT-5)
+#+FILETAGS: :retrospective:orgmode:
+#+PROPERTY: repo obsidian-org-mode
+#+PROPERTY: branch review/runtime-errors
+
+* Highlights
+** ROI-Led Execution
+   Sequencing fixes by ROI (keys → folding → helper init → path utilities → TODO/checkbox) kept each change unblocked by the next, enabling stable validation after every step.
+** Leveraging CodeMirror Primitives
+   Reusing native commands (foldCode, indentMore/Less, swapLineUp/Down) reduced bespoke logic and simplified lifecycle management inside `OrgView`.
+** Environment Reconciliation
+   Bridging web-IDE assumptions (dirname/pathBuilder, `#+SEQ_TODO` parsing) to Obsidian broadened coverage beyond the initial crashes and ensured vault-aware behavior.
+
+* Reflection
+** Type Safety Debt
+   Global `CodeMirror` references still require `@ts-ignore`; a `global.d.ts` declaration would remove recurring warnings and future regressions.
+** Missing Automated Tests
+   Manual reasoning plus `npm run build` validated changes, but the new parsing helpers (SEQ_TODO, checkbox cycling) would benefit from Jest/Vitest coverage.
+** Helper Duplication
+   Folding logic now lives both in `orgmode-mode.js` and `orgmode-fold.js`; consolidating them would avoid drift.
+** Visibility of ROI Plan
+   Recording priorities in `REVIEW.org` worked locally, yet mirroring the plan in an issue/PR would surface context to other contributors automatically.
