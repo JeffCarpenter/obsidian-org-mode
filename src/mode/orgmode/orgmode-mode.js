@@ -8,6 +8,9 @@
 })(function(CodeMirror) {
     "use strict";
 
+    const DEFAULT_TODO_KEYWORDS = ["TODO", "DOING", "WAITING", "NEXT", "PENDING"];
+    const DEFAULT_DONE_KEYWORDS = ["DONE", "CANCELLED", "CANCELED", "DEFERRED", "REJECTED", "STOP", "STOPPED"];
+
     CodeMirror.defineSimpleMode("orgmode", {
         start: [
             {regex: /(\*\s)(TODO|DOING|WAITING|NEXT|PENDING|)(CANCELLED|CANCELED|CANCEL|DONE|REJECTED|STOP|STOPPED|)(\s+\[\#[A-C]\]\s+|)(.*?)(?:(\s{10,}|))(\:[\S]+\:|)$/, sol: true, token: ["header level1 org-level-star","header level1 org-todo","header level1 org-done", "header level1 org-priority", "header level1", "header level1 void", "header level1 comment"]},
@@ -215,12 +218,22 @@
 
         function _toggleTodo(){
             const line = position.line;
-            cm.replaceRange("DONE", {line: line, ch: token.start}, {line: line, ch: token.end});
+            const keyword = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
+            const config = getTodoConfig(cm);
+            const next = cycleKeyword(keyword, config.todo);
+            if(next){
+                cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
+            }
         }
 
         function _toggleDone(){
             const line = position.line;
-            cm.replaceRange("TODO", {line: line, ch: token.start}, {line: line, ch: token.end});
+            const keyword = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
+            const config = getTodoConfig(cm);
+            const next = cycleKeyword(keyword, config.done);
+            if(next){
+                cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
+            }
         }
 
         function _togglePriority(){
@@ -428,6 +441,64 @@
             }
         }
         return false;
+    }
+
+    function cycleKeyword(current, list){
+        if(!list || list.length === 0) return current;
+        const idx = list.indexOf(current);
+        if(idx === -1){
+            return list[0];
+        }
+        const nextIndex = (idx + 1) % list.length;
+        return list[nextIndex];
+    }
+
+    function getTodoConfig(cm){
+        return parseSeqTodo(cm) || {
+            todo: DEFAULT_TODO_KEYWORDS.slice(0),
+            done: DEFAULT_DONE_KEYWORDS.slice(0)
+        };
+    }
+
+    function parseSeqTodo(cm){
+        if(!cm || typeof cm.lineCount !== "function") return null;
+        for(var i = 0; i < cm.lineCount(); i++){
+            var line = cm.getLine(i);
+            if(!line || line.charAt(0) !== "#") continue;
+            var match = line.match(/^\s*#\+SEQ_TODO:\s*(.+)$/i);
+            if(!match) continue;
+            var spec = match[1];
+            var sections = spec.split("|");
+            var undone = extractKeywords(sections[0]);
+            var done = [];
+            for(var s = 1; s < sections.length; s++){
+                done = done.concat(extractKeywords(sections[s]));
+            }
+            if(done.length === 0) done = DEFAULT_DONE_KEYWORDS.slice(0);
+            if(undone.length === 0) undone = DEFAULT_TODO_KEYWORDS.slice(0);
+            return {todo: uniquePreserveOrder(undone), done: uniquePreserveOrder(done)};
+        }
+        return null;
+    }
+
+    function extractKeywords(section){
+        if(!section) return [];
+        return section.trim().split(/\s+/).map(function(word){
+            return word.replace(/\(.*?\)/g, "").trim();
+        }).filter(Boolean);
+    }
+
+    function uniquePreserveOrder(list){
+        var seen = {};
+        var result = [];
+        for(var i = 0; i < list.length; i++){
+            var key = list[i];
+            if(!seen[key]){
+                seen[key] = true;
+                result.push(key);
+            }
+        }
+        return result;
     }
 
     function dirname(pathname){
