@@ -606,6 +606,8 @@ const {
 			cycleKeyword,
 			getTodoConfig,
 			parseSeqTodo,
+			toggleHandler,
+			foldLine,
 		};
 	}
 

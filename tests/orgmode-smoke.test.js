@@ -31,7 +31,7 @@ function createCodeMirrorStub() {
 
 function installGlobals() {
     global.window = {
-        location: { pathname: "/view/sample" },
+        location: { pathname: "/view/root/note" },
         open: jest.fn(),
     };
     global.document = {
@@ -48,6 +48,31 @@ function cleanupGlobals() {
     delete global.window;
     delete global.document;
     delete global.CodeMirror;
+}
+
+function createCmForToken(token, overrides = {}) {
+    const updateMock = jest.fn();
+    const base = {
+        coordsChar: jest.fn(() => ({ line: token.line ?? 0, ch: token.start ?? 0 })),
+        getTokenAt: jest.fn(() => token),
+        on: jest.fn((event, handler) => {
+            if (event === "beforeSelectionChange") {
+                handler(base, { update: updateMock });
+            }
+        }),
+        off: jest.fn(),
+        getRange: jest.fn().mockReturnValue(token.string || ""),
+        replaceRange: jest.fn(),
+        getCursor: jest.fn().mockReturnValue({ line: 0 }),
+        findMarksAt: jest.fn().mockReturnValue([]),
+        foldCode: jest.fn(),
+        state: {},
+        lineCount: () => 0,
+        getLine: jest.fn().mockReturnValue(""),
+        addLineWidget: jest.fn(() => ({ clear: jest.fn() })),
+        addEventListener: jest.fn(),
+    };
+    return Object.assign(base, overrides, { __updateMock: updateMock });
 }
 
 function loadOrgmodeModeModule() {
@@ -190,5 +215,86 @@ describe("orgmode CodeMirror integration", () => {
             todo: ["TODO", "NEXT"],
             done: ["DONE"],
         });
+    });
+
+    test("toggleHandler toggles checkbox and prevents selection", () => {
+        const mod = loadOrgmodeModeModule();
+        const { toggleHandler } = mod.__orgmodeTesting;
+
+        const cm = createCmForToken({
+            type: "org-toggle",
+            start: 0,
+            end: 3,
+            string: "[ ]",
+        });
+
+        toggleHandler(cm, { clientX: 5, clientY: 6 });
+        expect(cm.replaceRange).toHaveBeenCalledWith(
+            "[X]",
+            { line: 0, ch: 0 },
+            { line: 0, ch: 3 },
+        );
+        expect(cm.__updateMock).toHaveBeenCalled();
+    });
+
+    test("toggleHandler opens relative link when clicking org-url", () => {
+        const mod = loadOrgmodeModeModule();
+        const { toggleHandler } = mod.__orgmodeTesting;
+        const cm = createCmForToken({
+            type: "org-url",
+            start: 0,
+            end: 5,
+            string: "[[/next][Label]]",
+        });
+
+        toggleHandler(cm, { clientX: 1, clientY: 1 });
+        expect(global.window.open).toHaveBeenCalledWith("/view/root/next");
+    });
+
+    test("toggleHandler cycles TODO and DONE keywords", () => {
+        const mod = loadOrgmodeModeModule();
+        const { toggleHandler } = mod.__orgmodeTesting;
+        const todoCm = createCmForToken({
+            type: "org-todo",
+            start: 0,
+            end: 4,
+            string: "TODO",
+        });
+        toggleHandler(todoCm, { clientX: 2, clientY: 2 });
+        expect(todoCm.replaceRange).toHaveBeenCalledWith(
+            "DOING",
+            { line: 0, ch: 0 },
+            { line: 0, ch: 4 },
+        );
+
+        const doneCm = createCmForToken({
+            type: "org-done",
+            start: 0,
+            end: 4,
+            string: "DONE",
+        });
+        toggleHandler(doneCm, { clientX: 3, clientY: 3 });
+        expect(doneCm.replaceRange).toHaveBeenCalledWith(
+            "CANCELLED",
+            { line: 0, ch: 0 },
+            { line: 0, ch: 4 },
+        );
+    });
+
+    test("toggleHandler advances priority tokens", () => {
+        const mod = loadOrgmodeModeModule();
+        const { toggleHandler } = mod.__orgmodeTesting;
+        const cm = createCmForToken({
+            type: "org-priority",
+            start: 0,
+            end: 6,
+            string: " [#A] ",
+        });
+        toggleHandler(cm, { clientX: 4, clientY: 4 });
+        expect(cm.replaceRange).toHaveBeenCalledWith(
+            " [#B] ",
+            { line: 0, ch: 0 },
+            { line: 0, ch: 6 },
+        );
     });
 });
