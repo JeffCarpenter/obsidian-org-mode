@@ -301,8 +301,15 @@ function toggleHandler(cm, e) {
 			}
 		}
 
+		function hasValidTokenRange(token) {
+			return (
+				Number.isFinite(token?.start) && Number.isFinite(token?.end)
+			);
+		}
+
 		function _toggleCheckbox() {
 			const line = position.line;
+			if (!hasValidTokenRange(token) || line == null || line < 0) return;
 			const current = cm.getRange(
 				{ line: line, ch: token.start },
 				{ line: line, ch: token.end },
@@ -315,8 +322,28 @@ function toggleHandler(cm, e) {
 			);
 		}
 
+		function syncCheckbox(line, isDone) {
+			if (typeof cm.getLine !== "function") return;
+			const text = cm.getLine(line);
+			if (!text) return;
+			const match = text.match(/\[[xX\s-]\]/);
+			if (!match) return;
+			const start = match.index;
+			if (!Number.isFinite(start)) return;
+			const end = start + match[0].length;
+			const desired = isDone ? "[X]" : "[ ]";
+			const current = match[0];
+			if (current === desired) return;
+			cm.replaceRange(
+				desired,
+				{ line, ch: start },
+				{ line, ch: end },
+			);
+		}
+
 		function _toggleTodo() {
 			const line = position.line;
+			if (!hasValidTokenRange(token) || line == null || line < 0) return;
 			const keyword = cm.getRange(
 				{ line: line, ch: token.start },
 				{ line: line, ch: token.end },
@@ -329,11 +356,13 @@ function toggleHandler(cm, e) {
 					{ line: line, ch: token.start },
 					{ line: line, ch: token.end },
 				);
+				syncCheckbox(line, false);
 			}
 		}
 
 		function _toggleDone() {
 			const line = position.line;
+			if (!hasValidTokenRange(token) || line == null || line < 0) return;
 			const keyword = cm.getRange(
 				{ line: line, ch: token.start },
 				{ line: line, ch: token.end },
@@ -346,6 +375,7 @@ function toggleHandler(cm, e) {
 					{ line: line, ch: token.start },
 					{ line: line, ch: token.end },
 				);
+				syncCheckbox(line, true);
 			}
 		}
 
@@ -368,8 +398,9 @@ function toggleHandler(cm, e) {
 			const exist = widgets.has(position.line);
 
 			if (exist === false) {
-				if (!token.string.match(/\[\[(.*)\]\]/)) return null;
-				const $node = _buildImage(RegExp.$1);
+				const match = token.string.match(/\[\[(.*)\]\]/);
+				if (!match) return null;
+				const $node = _buildImage(match[1]);
 				const widget = cm.addLineWidget(position.line, $node, {
 					coverGutter: false,
 				});

@@ -280,26 +280,32 @@ describe("orgmode CodeMirror integration", () => {
             start: 0,
             end: 4,
             string: "TODO",
+        }, {
+            getLine: jest.fn().mockReturnValue("TODO [ ] heading"),
         });
         toggleHandler(todoCm, { clientX: 2, clientY: 2 });
-        expect(todoCm.replaceRange).toHaveBeenCalledWith(
+        expect(todoCm.replaceRange.mock.calls[0]).toEqual([
             "DOING",
             { line: 0, ch: 0 },
             { line: 0, ch: 4 },
-        );
+        ]);
+        expect(todoCm.replaceRange).toHaveBeenCalledTimes(1);
 
         const doneCm = createCmForToken({
             type: "org-done",
             start: 0,
             end: 4,
             string: "DONE",
+        }, {
+            getLine: jest.fn().mockReturnValue("DONE [ ] heading"),
         });
         toggleHandler(doneCm, { clientX: 3, clientY: 3 });
-        expect(doneCm.replaceRange).toHaveBeenCalledWith(
+        expect(doneCm.replaceRange.mock.calls[0]).toEqual([
             "CANCELLED",
             { line: 0, ch: 0 },
             { line: 0, ch: 4 },
-        );
+        ]);
+        expect(doneCm.replaceRange.mock.calls[1][0]).toBe("[X]");
     });
 
     test("toggleHandler advances priority tokens", () => {
