@@ -51,9 +51,11 @@ function cleanupGlobals() {
 }
 
 function loadOrgmodeModeModule() {
+    let exportsValue;
     jest.isolateModules(() => {
-        require(path.resolve(__dirname, "../src/mode/orgmode/orgmode-mode.js"));
+        exportsValue = require(path.resolve(__dirname, "../src/mode/orgmode/orgmode-mode.js"));
     });
+    return exportsValue || {};
 }
 
 describe("orgmode CodeMirror integration", () => {
@@ -122,6 +124,27 @@ describe("orgmode CodeMirror integration", () => {
             }),
         );
         expect(typeof teardown).toBe("function");
+
+        const extraKeys = editorStub.setOption.mock.calls[0][1];
+        const cmInstance = {
+            getCursor: () => ({ line: 0 }),
+            getTokenTypeAt: jest.fn().mockReturnValue("header"),
+            findMarksAt: jest.fn().mockReturnValue([]),
+            foldCode: jest.fn(),
+            state: {},
+            lineCount: () => 1,
+            operation: (fn) => fn(),
+        };
+
+        extraKeys.Tab(cmInstance);
+        expect(cmInstance.foldCode).toHaveBeenCalledWith(
+            { line: 0, ch: 0 },
+            null,
+            "fold",
+        );
+
+        extraKeys["Shift-Tab"](cmInstance);
+        expect(cmInstance.state.orgmodeHasCollapsedAll).toBe(true);
     });
 
     test("orgmode fold helper computes range for headings", () => {
@@ -145,6 +168,27 @@ describe("orgmode CodeMirror integration", () => {
         expect(range).toEqual({
             from: { line: 0, ch: "* Heading".length },
             to: { line: 1, ch: "Body".length },
+        });
+    });
+
+    test("cycleKeyword helper rotates entries", () => {
+        const mod = loadOrgmodeModeModule();
+        const helpers = mod.__orgmodeTesting;
+        expect(helpers.cycleKeyword("A", ["A", "B", "C"])).toBe("B");
+        expect(helpers.cycleKeyword("C", ["A", "B", "C"])).toBe("A");
+    });
+
+    test("getTodoConfig returns parsed keyword sets", () => {
+        const mod = loadOrgmodeModeModule();
+        const helpers = mod.__orgmodeTesting;
+        const cm = {
+            lineCount: () => 1,
+            getLine: () => "#+SEQ_TODO: TODO NEXT | DONE",
+        };
+        const config = helpers.getTodoConfig(cm);
+        expect(config).toEqual({
+            todo: ["TODO", "NEXT"],
+            done: ["DONE"],
         });
     });
 });

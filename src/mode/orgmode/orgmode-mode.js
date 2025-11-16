@@ -1,3 +1,10 @@
+const {
+	cycleCheckboxState,
+	dirname,
+	pathBuilder,
+	parseSeqTodoFromLines,
+} = require("./orgmode-utils");
+
 ((mod) => {
 	if (typeof exports === "object" && typeof module === "object")
 		mod(require("../../lib/codemirror"));
@@ -587,92 +594,19 @@
 
 	function parseSeqTodo(cm) {
 		if (!cm || typeof cm.lineCount !== "function") return null;
+		const lines = [];
 		for (let i = 0; i < cm.lineCount(); i++) {
-			const line = cm.getLine(i);
-			if (!line || line.charAt(0) !== "#") continue;
-			const match = line.match(/^\s*#\+SEQ_TODO:\s*(.+)$/i);
-			if (!match) continue;
-			const spec = match[1];
-			const sections = spec.split("|");
-			let undone = extractKeywords(sections[0]);
-			let done = [];
-			for (let s = 1; s < sections.length; s++) {
-				done = done.concat(extractKeywords(sections[s]));
-			}
-			if (done.length === 0) done = DEFAULT_DONE_KEYWORDS.slice(0);
-			if (undone.length === 0) undone = DEFAULT_TODO_KEYWORDS.slice(0);
-			return {
-				todo: uniquePreserveOrder(undone),
-				done: uniquePreserveOrder(done),
-			};
+			lines.push(cm.getLine(i));
 		}
-		return null;
+		return parseSeqTodoFromLines(lines, DEFAULT_TODO_KEYWORDS, DEFAULT_DONE_KEYWORDS);
 	}
 
-	function extractKeywords(section) {
-		if (!section) return [];
-		return section
-			.trim()
-			.split(/\s+/)
-			.map((word) => word.replace(/\(.*?\)/g, "").trim())
-			.filter(Boolean);
-	}
-
-	function uniquePreserveOrder(list) {
-		var seen = {};
-		var result = [];
-		for (let i = 0; i < list.length; i++) {
-			const key = list[i];
-			if (!seen[key]) {
-				seen[key] = true;
-				result.push(key);
-			}
-		}
-		return result;
-	}
-
-	function cycleCheckboxState(value) {
-		var normalized = (value || "").toUpperCase();
-		var order = ["[ ]", "[X]", "[-]"];
-		var index = order.indexOf(normalized);
-		if (index === -1) {
-			return "[X]";
-		}
-		var next = order[(index + 1) % order.length];
-		if (value && value.charAt(1) === "x" && next === "[X]") {
-			return "[x]";
-		}
-		return next;
-	}
-
-	function dirname(pathname) {
-		if (typeof pathname !== "string" || pathname.length === 0) return "/";
-		var normalized = pathname.replace(/\\/g, "/");
-		normalized = normalized.replace(/\/+$/, "");
-		if (normalized === "") return "/";
-		var idx = normalized.lastIndexOf("/");
-		if (idx <= 0) return "/";
-		return normalized.slice(0, idx);
-	}
-
-	function pathBuilder(root, relative) {
-		var stack = [];
-		function pushParts(parts) {
-			for (let i = 0; i < parts.length; i++) {
-				const part = parts[i];
-				if (!part || part === ".") continue;
-				if (part === "..") {
-					if (stack.length) stack.pop();
-				} else {
-					stack.push(part);
-				}
-			}
-		}
-		var base = (root || "").replace(/\\/g, "/").split("/");
-		var rel = (relative || "").replace(/\\/g, "/").split("/");
-		pushParts(base);
-		pushParts(rel);
-		return `/${stack.join("/")}`;
+	if (typeof module === "object" && typeof module.exports === "object") {
+		module.exports.__orgmodeTesting = {
+			cycleKeyword,
+			getTodoConfig,
+			parseSeqTodo,
+		};
 	}
 
 	CodeMirror.defineMIME("text/org", "org");
