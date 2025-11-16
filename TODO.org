@@ -1,0 +1,4 @@
+#+TITLE: obsidian-org-mode TODO
+* DONE Wire CodeMirror org helper in OrgView
+  CLOSED: [2025-11-16]
+  Ensured each view calls the registered orgmode helper and tears it down so folding/toggle logic actually executes.

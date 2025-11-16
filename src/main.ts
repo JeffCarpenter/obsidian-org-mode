@@ -26,6 +26,7 @@ export default class OrgMode extends Plugin {
 class OrgView extends TextFileView {
     // Internal code mirror instance:
     codeMirror: CodeMirror.Editor;
+    private destroyOrgHelper?: () => void;
 
     // this.contentEl is not exposed, so cheat a bit.
     public get extContentEl(): HTMLElement {
@@ -38,6 +39,7 @@ class OrgView extends TextFileView {
         // @ts-ignore
         this.codeMirror = CodeMirror(this.extContentEl);
 
+        this.destroyOrgHelper = this.initializeOrgHelper(this.codeMirror);
         this.codeMirror.on("changes", this.changed);
     }
 
@@ -94,5 +96,36 @@ class OrgView extends TextFileView {
 
     getViewType() {
         return "orgmode";
+    }
+
+    async onClose() {
+        await super.onClose();
+        this.teardownOrgHelper();
+    }
+
+    private initializeOrgHelper(editor: CodeMirror.Editor) {
+        // @ts-ignore CodeMirror is provided globally by Obsidian
+        const helpers = (CodeMirror as any)?.helpers;
+        const orgHelper = helpers?.orgmode;
+        if (orgHelper?.init) {
+            const maybeDestroy = orgHelper.init(editor);
+            if (typeof maybeDestroy === "function") {
+                return () => {
+                    try {
+                        maybeDestroy();
+                    } catch (error) {
+                        console.error("Failed to teardown org helper", error);
+                    }
+                };
+            }
+        }
+        return undefined;
+    }
+
+    private teardownOrgHelper() {
+        if (this.destroyOrgHelper) {
+            this.destroyOrgHelper();
+            this.destroyOrgHelper = undefined;
+        }
     }
 }
