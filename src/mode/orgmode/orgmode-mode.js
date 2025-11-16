@@ -609,6 +609,9 @@ function toggleHandler(cm, e) {
 			toggleHandler,
 			foldLine,
 			org_insert_todo_heading,
+			org_cycle,
+			org_shifttab,
+			toggleHeadingFold,
 		};
 	}
 

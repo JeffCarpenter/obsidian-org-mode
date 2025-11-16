@@ -375,4 +375,68 @@ describe("orgmode CodeMirror integration", () => {
             "unfold",
         );
     });
+
+    test("org_cycle falls back to default tab when nothing to fold", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            getCursor: () => ({ line: 0, ch: 0 }),
+            getTokenTypeAt: () => "text",
+            execCommand: jest.fn(),
+            lineCount: () => 0,
+        };
+        helpers.org_cycle(cm);
+        expect(cm.execCommand).toHaveBeenCalledWith("defaultTab");
+    });
+
+    test("org_cycle toggles fold/unfold on headers", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            getCursor: () => ({ line: 0, ch: 0 }),
+            getTokenTypeAt: () => "header",
+            findMarksAt: jest
+                .fn()
+                .mockReturnValueOnce([])
+                .mockReturnValueOnce([{ __isFold: true }]),
+            foldCode: jest.fn(),
+            state: {},
+            lineCount: () => 1,
+        };
+
+        helpers.org_cycle(cm);
+        helpers.org_cycle(cm);
+        expect(cm.foldCode).toHaveBeenNthCalledWith(
+            1,
+            { line: 0, ch: 0 },
+            null,
+            "fold",
+        );
+        expect(cm.foldCode).toHaveBeenNthCalledWith(
+            2,
+            { line: 0, ch: 0 },
+            null,
+            "unfold",
+        );
+    });
+
+    test("toggleHandler prevents default on touch events", () => {
+        const { toggleHandler } = getTestingHelpers();
+        const cm = createCmForToken({
+            type: "org-level-star",
+            start: 0,
+            end: 1,
+            string: "*",
+        }, {
+            findMarksAt: jest.fn(() => []),
+            foldCode: jest.fn(),
+        });
+        const preventDefault = jest.fn();
+        const originalTouchstart = global.window.ontouchstart;
+        global.window.ontouchstart = () => {};
+        toggleHandler(cm, {
+            targetTouches: [{}],
+            preventDefault,
+        });
+        expect(preventDefault).toHaveBeenCalled();
+        global.window.ontouchstart = originalTouchstart;
+    });
 });
