@@ -1,4 +1,7 @@
 {
     "testEnvironment": "node",
-    "verbose": true
+    "verbose": true,
+    "collectCoverage": true,
+    "collectCoverageFrom": ["src/mode/orgmode/**/*.js"],
+    "coverageReporters": ["text", "lcov"]
 }
