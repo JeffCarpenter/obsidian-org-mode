@@ -1,7 +1,8 @@
 (function (factory) {
+	/* istanbul ignore next */
 	if (typeof module === "object" && typeof module.exports === "object") {
 		module.exports = factory();
-	} else {
+	} else /* istanbul ignore next */ {
 		const exports = factory();
 		Object.assign((window.OrgModeUtils = window.OrgModeUtils || {}), exports);
 	}
@@ -14,9 +15,6 @@
 			return "[X]";
 		}
 		const next = order[(index + 1) % order.length];
-		if (value && value.charAt(1) === "x" && next === "[X]") {
-			return "[x]";
-		}
 		return next;
 	}
 

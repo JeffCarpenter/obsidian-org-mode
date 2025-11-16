@@ -6,8 +6,10 @@ const {
 } = require("./orgmode-utils");
 
 ((mod) => {
+	/* istanbul ignore next */
 	if (typeof exports === "object" && typeof module === "object")
 		mod(require("../../lib/codemirror"));
+	/* istanbul ignore next */
 	else if (typeof define === "function" && define.amd)
 		define(["../../lib/codemirror"], mod);
 	else mod(CodeMirror);
@@ -23,7 +25,9 @@ const {
 		"STOPPED",
 	];
 
-	CodeMirror.defineSimpleMode("orgmode", {
+	/* istanbul ignore next */
+	function registerOrgmodeSimpleMode(CodeMirror) {
+		CodeMirror.defineSimpleMode("orgmode", {
 		start: [
 			{
 				regex:
@@ -88,7 +92,9 @@ const {
 			},
 			{ regex: /.*/, token: "comment" },
 		],
-	});
+		});
+	}
+	registerOrgmodeSimpleMode(CodeMirror);
 
 	CodeMirror.registerHelper("fold", "orgmode", (cm, start) => {
 		// init
@@ -643,6 +649,15 @@ function toggleHandler(cm, e) {
 			org_cycle,
 			org_shifttab,
 			toggleHeadingFold,
+			org_metaleft,
+			org_metaright,
+			org_meta_return,
+			org_metaup,
+			org_metadown,
+			org_shiftmetaleft,
+			org_shiftmetaright,
+			execDefaultTab,
+			execCommand,
 		};
 	}
 

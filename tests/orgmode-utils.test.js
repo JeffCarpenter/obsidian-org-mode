@@ -11,6 +11,10 @@ describe("orgmode utility helpers", () => {
         test("preserves lowercase x when cycling", () => {
             expect(utils.cycleCheckboxState("[x]")).toBe("[-]");
         });
+
+        test("defaults to [X] for unknown symbols", () => {
+            expect(utils.cycleCheckboxState("???")).toBe("[X]");
+        });
     });
 
     describe("path helpers", () => {
@@ -22,6 +26,7 @@ describe("orgmode utility helpers", () => {
         test("pathBuilder resolves relative paths", () => {
             expect(utils.pathBuilder("/root", "child/file")).toBe("/root/child/file");
             expect(utils.pathBuilder("/root/child", "../other")).toBe("/root/other");
+            expect(utils.pathBuilder("/root", "./inner/./file")).toBe("/root/inner/file");
         });
     });
 
@@ -41,6 +46,10 @@ describe("orgmode utility helpers", () => {
             const lines = ["#+SEQ_TODO: |" ];
             const parsed = utils.parseSeqTodoFromLines(lines, ["A"], ["B"]);
             expect(parsed).toEqual({ todo: ["A"], done: ["B"] });
+        });
+
+        test("returns null for invalid input", () => {
+            expect(utils.parseSeqTodoFromLines(null, ["A"], ["B"])).toBeNull();
         });
     });
 });

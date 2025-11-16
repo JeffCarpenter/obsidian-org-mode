@@ -3,7 +3,6 @@
     "verbose": true,
     "collectCoverage": true,
     "collectCoverageFrom": [
-        "src/mode/orgmode/orgmode-mode.js",
         "src/mode/orgmode/orgmode-utils.js"
     ],
     "coverageReporters": ["text", "lcov"]

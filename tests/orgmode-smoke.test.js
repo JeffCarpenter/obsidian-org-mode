@@ -445,4 +445,109 @@ describe("orgmode CodeMirror integration", () => {
         expect(preventDefault).toHaveBeenCalled();
         global.window.ontouchstart = originalTouchstart;
     });
+
+    test("toggleHandler ignores malformed checkbox tokens", () => {
+        const { toggleHandler } = getTestingHelpers();
+        const cm = createCmForToken({
+            type: "org-toggle",
+            line: 5,
+            start: undefined,
+            end: undefined,
+            string: "[ ]",
+        });
+        toggleHandler(cm, { clientX: 0, clientY: 0 });
+        expect(cm.replaceRange).not.toHaveBeenCalled();
+    });
+
+    test("toggleHandler wraps priorities back to [#A]", () => {
+        const { toggleHandler } = getTestingHelpers();
+        const cm = createCmForToken({
+            type: "org-priority",
+            start: 0,
+            end: 6,
+            string: " [#C] ",
+        });
+        toggleHandler(cm, { clientX: 3, clientY: 3 });
+        expect(cm.replaceRange).toHaveBeenCalledWith(
+            " [#A] ",
+            { line: 0, ch: 0 },
+            { line: 0, ch: 6 },
+        );
+    });
+
+    test("org_shifttab collapses and expands headers", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            state: {},
+            lineCount: () => 2,
+            getTokenTypeAt: (pos) => (pos.line === 0 ? "header" : "text"),
+            foldCode: jest.fn(),
+            operation: (fn) => fn(),
+        };
+        helpers.org_shifttab(cm);
+        expect(cm.state.orgmodeHasCollapsedAll).toBe(true);
+        expect(cm.foldCode).toHaveBeenCalledWith(
+            { line: 0, ch: 0 },
+            null,
+            "fold",
+        );
+        helpers.org_shifttab(cm);
+        expect(cm.state.orgmodeHasCollapsedAll).toBe(false);
+        expect(cm.foldCode).toHaveBeenCalledWith(
+            { line: 0, ch: 0 },
+            null,
+            "unfold",
+        );
+    });
+
+    test("toggleHeadingFold only folds headers", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            getCursor: () => ({ line: 0, ch: 0 }),
+            getTokenTypeAt: (pos) => (pos.line === 0 ? "header" : "text"),
+            lineCount: () => 1,
+            findMarksAt: jest.fn(() => []),
+            foldCode: jest.fn(),
+        };
+        expect(helpers.toggleHeadingFold(cm)).toBe(true);
+        expect(cm.foldCode).toHaveBeenCalledWith(
+            { line: 0, ch: 0 },
+            null,
+            "fold",
+        );
+        cm.getCursor = () => ({ line: 1, ch: 0 });
+        expect(helpers.toggleHeadingFold(cm)).toBe(false);
+    });
+
+    test("org_cycle inserts literal tab when execCommand missing", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            getCursor: () => ({ line: 0, ch: 0 }),
+            getTokenTypeAt: () => "text",
+            replaceSelection: jest.fn(),
+            lineCount: () => 0,
+        };
+        helpers.org_cycle(cm);
+        expect(cm.replaceSelection).toHaveBeenCalledWith("\t");
+    });
+
+    test("org meta commands delegate to CodeMirror command table", () => {
+        const helpers = getTestingHelpers();
+        const indentLess = jest.fn();
+        const swapUp = jest.fn();
+        const codeMirror = global.CodeMirror;
+        codeMirror.commands.indentLess = indentLess;
+        codeMirror.commands.swapLineUp = swapUp;
+        helpers.org_metaleft({});
+        helpers.org_metaup({});
+        expect(indentLess).toHaveBeenCalled();
+        expect(swapUp).toHaveBeenCalled();
+    });
+
+    test("execCommand falls back when command missing", () => {
+        const helpers = getTestingHelpers();
+        const fallback = jest.fn();
+        helpers.execCommand({}, "unknown", fallback);
+        expect(fallback).toHaveBeenCalled();
+    });
 });
