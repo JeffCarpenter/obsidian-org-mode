@@ -237,9 +237,9 @@ const {
 		isFold(cm, cursor) ? unfold(cm, cursor) : fold(cm, cursor);
 	}
 
-	let widgets = [];
-	function toggleHandler(cm, e) {
-		const position = cm.coordsChar(
+function toggleHandler(cm, e) {
+	const widgets = cm.__orgmodeWidgets || (cm.__orgmodeWidgets = new Set());
+	const position = cm.coordsChar(
 				{
 					left: e.clientX || e.targetTouches?.[0].clientX,
 					top: e.clientY || e.targetTouches?.[0].clientY,
@@ -365,7 +365,7 @@ const {
 		}
 
 		function _toggleImageWidget() {
-			const exist = !!widgets.filter((line) => line === position.line)[0];
+			const exist = widgets.has(position.line);
 
 			if (exist === false) {
 				if (!token.string.match(/\[\[(.*)\]\]/)) return null;
@@ -373,13 +373,13 @@ const {
 				const widget = cm.addLineWidget(position.line, $node, {
 					coverGutter: false,
 				});
-				widgets.push(position.line);
+				widgets.add(position.line);
 				$node.addEventListener("click", closeWidget);
 
 				function closeWidget() {
 					widget.clear();
 					$node.removeEventListener("click", closeWidget);
-					widgets = widgets.filter((line) => line !== position.line);
+					widgets.delete(position.line);
 				}
 			}
 			function _buildImage(src) {
@@ -404,8 +404,8 @@ const {
 		}
 
 		function _navigateLink() {
-			token.string.match(/\[\[(.*?)\]\[/);
-			const link = RegExp.$1;
+			const match = token.string.match(/\[\[(.*?)\]\[/);
+			const link = match && match[1];
 			if (!link) return;
 
 			if (/^https?:\/\//.test(link)) {
