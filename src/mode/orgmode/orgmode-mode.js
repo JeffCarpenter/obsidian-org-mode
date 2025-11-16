@@ -211,9 +211,9 @@
 
         function _toggleCheckbox(){
             const line = position.line;
-            const content = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
-            let new_content = content === "[X]" || content === "[x]" ? "[ ]" : "[X]";
-            cm.replaceRange(new_content, {line: line, ch: token.start}, {line: line, ch: token.end});
+            const current = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
+            const next = cycleCheckboxState(current);
+            cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
         }
 
         function _toggleTodo(){
@@ -499,6 +499,20 @@
             }
         }
         return result;
+    }
+
+    function cycleCheckboxState(value){
+        var normalized = (value || "").toUpperCase();
+        var order = ["[ ]", "[X]", "[-]"];
+        var index = order.indexOf(normalized);
+        if(index === -1){
+            return "[X]";
+        }
+        var next = order[(index + 1) % order.length];
+        if(value && value.charAt(1) === "x" && next === "[X]"){
+            return "[x]";
+        }
+        return next;
     }
 
     function dirname(pathname){

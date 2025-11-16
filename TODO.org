@@ -8,3 +8,6 @@
 * DONE Respect custom TODO keywords
   CLOSED: [2025-11-16]
   Updated TODO/done toggle handlers to cycle through document-defined sequences without overwriting user-defined states.
+* DONE Cycle checkbox states safely
+  CLOSED: [2025-11-16]
+  Improved checkbox toggles so `[ ]`, `[X]`, and `[-]` are cycled rather than overwritten with a constant `[X]`.
