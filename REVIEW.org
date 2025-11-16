@@ -38,3 +38,15 @@
   1. Restore or replace the missing helper implementations and folding commands.
   2. Wire the helper initialisation/destroy cycle into =OrgView= so CodeMirror actually receives the custom behavior.
   3. Replace browser-only path handling with Obsidian-aware utilities and guard checkbox/TODO toggles so they respect user-defined keywords.
+
+* Priorities
+** [#A] Critical Undeclared keybinding targets
+   Highest ROI: every Tab/Shift-Tab/meta key currently crashes, so importing/remapping the org-mode command implementations instantly restores basic editing.
+** [#A] Critical Missing folding helpers
+   Folding never initialises; providing the fold/toggle helpers unlocks signature org-mode behavior for all users with a bounded amount of work.
+** [#B] High Helper never initialised
+   Ensuring =OrgView= calls the registered helper after constructing CodeMirror is a small change that enables all other behaviors and prevents partial init bugs.
+** [#B] High Undefined path utilities
+   Replacing the browser-only =dirname=/=pathBuilder= usage with Obsidian-aware path helpers keeps checkbox/link interactions reliable across vaults.
+** [#C] Medium TODO/checkbox toggles overwrite user state
+   Once stability is restored, respecting user-defined TODO sequences and checkbox states preserves workflows for power users and prevents silent data corruption.
