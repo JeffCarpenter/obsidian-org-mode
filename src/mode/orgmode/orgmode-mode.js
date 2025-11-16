@@ -1,549 +1,679 @@
-(function(mod) {
-    if (typeof exports == "object" && typeof module == "object")
-        mod(require("../../lib/codemirror"));
-    else if (typeof define == "function" && define.amd)
-        define(["../../lib/codemirror"], mod);
-    else
-        mod(CodeMirror);
-})(function(CodeMirror) {
-    "use strict";
+((mod) => {
+	if (typeof exports === "object" && typeof module === "object")
+		mod(require("../../lib/codemirror"));
+	else if (typeof define === "function" && define.amd)
+		define(["../../lib/codemirror"], mod);
+	else mod(CodeMirror);
+})(function (CodeMirror) {
+	const DEFAULT_TODO_KEYWORDS = ["TODO", "DOING", "WAITING", "NEXT", "PENDING"];
+	const DEFAULT_DONE_KEYWORDS = [
+		"DONE",
+		"CANCELLED",
+		"CANCELED",
+		"DEFERRED",
+		"REJECTED",
+		"STOP",
+		"STOPPED",
+	];
 
-    const DEFAULT_TODO_KEYWORDS = ["TODO", "DOING", "WAITING", "NEXT", "PENDING"];
-    const DEFAULT_DONE_KEYWORDS = ["DONE", "CANCELLED", "CANCELED", "DEFERRED", "REJECTED", "STOP", "STOPPED"];
+	CodeMirror.defineSimpleMode("orgmode", {
+		start: [
+			{
+				regex:
+					/(\*\s)(TODO|DOING|WAITING|NEXT|PENDING|)(CANCELLED|CANCELED|CANCEL|DONE|REJECTED|STOP|STOPPED|)(\s+\[#[A-C]\]\s+|)(.*?)(?:(\s{10,}|))(:[\S]+:|)$/,
+				sol: true,
+				token: [
+					"header level1 org-level-star",
+					"header level1 org-todo",
+					"header level1 org-done",
+					"header level1 org-priority",
+					"header level1",
+					"header level1 void",
+					"header level1 comment",
+				],
+			},
+			{
+				regex:
+					/(\*{1,}\s)(TODO|DOING|WAITING|NEXT|PENDING|)(CANCELLED|CANCELED|CANCEL|DEFERRED|DONE|REJECTED|STOP|STOPPED|)(\s+\[#[A-C]\]\s+|)(.*?)(?:(\s{10,}|))(:[\S]+:|)$/,
+				sol: true,
+				token: [
+					"header org-level-star",
+					"header org-todo",
+					"header org-done",
+					"header org-priority",
+					"header",
+					"header void",
+					"header comment",
+				],
+			},
+			{ regex: /(\+[^+]+\+)/, token: ["strikethrough"] },
+			{ regex: /(\*[^*]+\*)/, token: ["strong"] },
+			{ regex: /(\/[^/]+\/)/, token: ["em"] },
+			{ regex: /(_[^_]+_)/, token: ["link"] },
+			{ regex: /(~[^~]+~)/, token: ["comment"] },
+			{ regex: /(=[^=]+=)/, token: ["comment"] },
+			{ regex: /\[\[[^[\]]+\]\[[^[\]]+\]\]/, token: "org-url" }, // links
+			{ regex: /\[\[[^[\]]+\]\]/, token: "org-image" }, // image
+			{ regex: /\[[xX\s\-_]\]/, token: "qualifier org-toggle" }, // checkbox
+			{
+				regex: /#\+(?:(BEGIN|begin))_[a-zA-Z]*/,
+				token: "comment",
+				next: "env",
+				sol: true,
+			}, // comments
+			{ regex: /:?[A-Z_]+:.*/, token: "comment", sol: true }, // property drawers
+			{
+				regex: /(#\+[a-zA-Z_]*)(:.*)/,
+				token: ["keyword", "qualifier"],
+				sol: true,
+			}, // environments
+			{
+				regex: /(CLOCK:|SHEDULED:|DEADLINE:)(\s.+)/,
+				token: ["comment", "keyword"],
+			},
+		],
+		env: [
+			{
+				regex: /#\+(?:(END|end))_[a-zA-Z]*/,
+				token: "comment",
+				next: "start",
+				sol: true,
+			},
+			{ regex: /.*/, token: "comment" },
+		],
+	});
 
-    CodeMirror.defineSimpleMode("orgmode", {
-        start: [
-            {regex: /(\*\s)(TODO|DOING|WAITING|NEXT|PENDING|)(CANCELLED|CANCELED|CANCEL|DONE|REJECTED|STOP|STOPPED|)(\s+\[\#[A-C]\]\s+|)(.*?)(?:(\s{10,}|))(\:[\S]+\:|)$/, sol: true, token: ["header level1 org-level-star","header level1 org-todo","header level1 org-done", "header level1 org-priority", "header level1", "header level1 void", "header level1 comment"]},
-            {regex: /(\*{1,}\s)(TODO|DOING|WAITING|NEXT|PENDING|)(CANCELLED|CANCELED|CANCEL|DEFERRED|DONE|REJECTED|STOP|STOPPED|)(\s+\[\#[A-C]\]\s+|)(.*?)(?:(\s{10,}|))(\:[\S]+\:|)$/, sol: true, token: ["header org-level-star","header org-todo","header org-done", "header org-priority", "header", "header void", "header comment"]},
-            {regex: /(\+[^\+]+\+)/, token: ["strikethrough"]},
-            {regex: /(\*[^\*]+\*)/, token: ["strong"]},
-            {regex: /(\/[^\/]+\/)/, token: ["em"]},
-            {regex: /(\_[^\_]+\_)/, token: ["link"]},
-            {regex: /(\~[^\~]+\~)/, token: ["comment"]},
-            {regex: /(\=[^\=]+\=)/, token: ["comment"]},
-            {regex: /\[\[[^\[\]]+\]\[[^\[\]]+\]\]/, token: "org-url"}, // links
-            {regex: /\[\[[^\[\]]+\]\]/, token: "org-image"}, // image
-            {regex: /\[[xX\s\-\_]\]/, token: 'qualifier org-toggle'}, // checkbox
-            {regex: /\#\+(?:(BEGIN|begin))_[a-zA-Z]*/, token: "comment", next: "env", sol: true}, // comments
-            {regex: /:?[A-Z_]+\:.*/, token: "comment", sol: true}, // property drawers
-            {regex: /(\#\+[a-zA-Z_]*)(\:.*)/, token: ["keyword", 'qualifier'], sol: true}, // environments
-            {regex: /(CLOCK\:|SHEDULED\:|DEADLINE\:)(\s.+)/, token: ["comment", "keyword"]}
-        ],
-        env: [
-            {regex: /\#\+(?:(END|end))_[a-zA-Z]*/, token: "comment", next: "start", sol: true},
-            {regex: /.*/, token: "comment"}
-        ]
-    });
+	CodeMirror.registerHelper("fold", "orgmode", (cm, start) => {
+		// init
+		const levelToMatch = headerLevel(start.line);
 
+		// no folding needed
+		if (levelToMatch === null) return;
 
-    CodeMirror.registerHelper("fold", "orgmode", function(cm, start) {
-        // init
-        const levelToMatch = headerLevel(start.line);
+		// find folding limits
+		const lastLine = cm.lastLine();
+		let end = start.line;
+		while (end < lastLine) {
+			end += 1;
+			const level = headerLevel(end);
+			if (level && level <= levelToMatch) {
+				end = end - 1;
+				break;
+			}
+		}
 
-        // no folding needed
-        if(levelToMatch === null) return;
+		return {
+			from: CodeMirror.Pos(start.line, cm.getLine(start.line).length),
+			to: CodeMirror.Pos(end, cm.getLine(end).length),
+		};
 
-        // find folding limits
-        const lastLine = cm.lastLine();
-        let end = start.line;
-        while(end < lastLine){
-            end += 1;
-            let level = headerLevel(end);
-            if(level && level <= levelToMatch) {
-                end = end - 1;
-                break;
-            };
-        }
+		function headerLevel(lineNo) {
+			var line = cm.getLine(lineNo);
+			var match = /^\*+/.exec(line);
+			if (
+				match &&
+				match.length === 1 &&
+				/header/.test(cm.getTokenTypeAt(CodeMirror.Pos(lineNo, 0)))
+			) {
+				return match[0].length;
+			}
+			return null;
+		}
+	});
+	CodeMirror.registerGlobalHelper(
+		"fold",
+		"drawer",
+		(mode) => mode.name === "orgmode",
+		(cm, start) => {
+			const drawer = isBeginningOfADrawer(start.line);
+			if (drawer === false) return;
 
-        return {
-            from: CodeMirror.Pos(start.line, cm.getLine(start.line).length),
-            to: CodeMirror.Pos(end, cm.getLine(end).length)
-        };
+			// find folding limits
+			const lastLine = cm.lastLine();
+			let end = start.line;
+			while (end < lastLine) {
+				end += 1;
+				if (isEndOfADrawer(end)) {
+					break;
+				}
+			}
 
-        function headerLevel(lineNo) {
-            var line = cm.getLine(lineNo);
-            var match = /^\*+/.exec(line);
-            if(match && match.length === 1 && /header/.test(cm.getTokenTypeAt(CodeMirror.Pos(lineNo, 0)))){
-                return match[0].length;
-            }
-            return null;
-        }
-    });
-    CodeMirror.registerGlobalHelper("fold", "drawer", function(mode) {
-        return mode.name === 'orgmode' ? true : false;
-    }, function(cm, start) {
-        const drawer = isBeginningOfADrawer(start.line);
-        if(drawer === false) return;
+			return {
+				from: CodeMirror.Pos(start.line, cm.getLine(start.line).length),
+				to: CodeMirror.Pos(end, cm.getLine(end).length),
+			};
 
-        // find folding limits
-        const lastLine = cm.lastLine();
-        let end = start.line;
-        while(end < lastLine){
-            end += 1;
-            if(isEndOfADrawer(end)){
-                break;
-            }
-        }
+			function isBeginningOfADrawer(lineNo) {
+				var line = cm.getLine(lineNo);
+				var match = /^:.*:$/.exec(line);
+				if (match && match.length === 1 && match[0] !== ":END:") {
+					return true;
+				}
+				return false;
+			}
+			function isEndOfADrawer(lineNo) {
+				var line = cm.getLine(lineNo);
+				return line.trim() === ":END:";
+			}
+		},
+	);
 
-        return {
-            from: CodeMirror.Pos(start.line, cm.getLine(start.line).length),
-            to: CodeMirror.Pos(end, cm.getLine(end).length)
-        };
+	CodeMirror.registerHelper("orgmode", "init", (editor, fn) => {
+		const registerHelperCallback = typeof fn === "function" ? fn : () => {};
+		editor.setOption("extraKeys", {
+			Tab: (cm) => {
+				org_cycle(cm);
+			},
+			"Shift-Tab": (cm) => {
+				org_shifttab(cm);
+			},
+			"Alt-Left": (cm) => {
+				org_metaleft(cm);
+			},
+			"Alt-Right": (cm) => {
+				org_metaright(cm);
+			},
+			"Alt-Enter": (cm) => {
+				org_meta_return(cm);
+			},
+			"Alt-Up": (cm) => {
+				org_metaup(cm);
+			},
+			"Alt-Down": (cm) => {
+				org_metadown(cm);
+			},
+			"Shift-Alt-Left": (cm) => {
+				org_shiftmetaleft(cm);
+			},
+			"Shift-Alt-Right": (cm) => {
+				org_shiftmetaright(cm);
+			},
+			"Shift-Alt-Enter": (cm) => {
+				org_insert_todo_heading(cm);
+			},
+			"Shift-Left": (cm) => {
+				org_shiftleft(cm);
+			},
+			"Shift-Right": (cm) => {
+				org_shiftright(cm);
+			},
+		});
+		registerHelperCallback("shifttab", () => {
+			org_shifttab(editor);
+		});
 
-        function isBeginningOfADrawer(lineNo) {
-            var line = cm.getLine(lineNo);
-            var match = /^\:.*\:$/.exec(line);
-            if(match && match.length === 1 && match[0] !== ':END:'){
-                return true;
-            }
-            return false;
-        }
-        function isEndOfADrawer(lineNo){
-            var line = cm.getLine(lineNo);
-            return line.trim() === ':END:' ? true : false;
-        }
-    });
+		editor.on("mousedown", toggleHandler);
+		editor.on("touchstart", toggleHandler);
+		editor.on("gutterClick", foldLine);
 
+		// fold everything except headers by default
+		editor.operation(() => {
+			for (let i = 0; i < editor.lineCount(); i++) {
+				if (
+					/header/.test(editor.getTokenTypeAt(CodeMirror.Pos(i, 0))) === false
+				) {
+					fold(editor, CodeMirror.Pos(i, 0));
+				}
+			}
+		});
+		return CodeMirror.orgmode.destroy.bind(this, editor);
+	});
 
-    CodeMirror.registerHelper("orgmode", "init", (editor, fn) => {
-        const registerHelperCallback = typeof fn === "function" ? fn : () => {};
-        editor.setOption("extraKeys", {
-            "Tab": function(cm) { org_cycle(cm); },
-            "Shift-Tab": function(cm){ org_shifttab(cm); },
-            "Alt-Left": function(cm){ org_metaleft(cm); },
-            "Alt-Right": function(cm){ org_metaright(cm); },
-            "Alt-Enter": function(cm){ org_meta_return(cm); },
-            "Alt-Up": function(cm){ org_metaup(cm); },
-            "Alt-Down": function(cm){ org_metadown(cm); },
-            "Shift-Alt-Left": function(cm){ org_shiftmetaleft(cm); },
-            "Shift-Alt-Right": function(cm){ org_shiftmetaright(cm); },
-            "Shift-Alt-Enter": function(cm){ org_insert_todo_heading(cm); },
-            "Shift-Left": function(cm){ org_shiftleft(cm); },
-            "Shift-Right": function(cm){ org_shiftright(cm); }
-        });
-        registerHelperCallback('shifttab', function() { org_shifttab(editor); });
+	CodeMirror.registerHelper("orgmode", "destroy", (editor) => {
+		editor.off("mousedown", toggleHandler);
+		editor.off("touchstart", toggleHandler);
+		editor.off("gutterClick", foldLine);
+	});
 
-        editor.on('mousedown', toggleHandler);
-        editor.on('touchstart', toggleHandler);
-        editor.on('gutterClick', foldLine);
+	function foldLine(cm, line) {
+		const cursor = { line: line, ch: 0 };
+		isFold(cm, cursor) ? unfold(cm, cursor) : fold(cm, cursor);
+	}
 
-        // fold everything except headers by default
-        editor.operation(function() {
-            for (var i = 0; i < editor.lineCount() ; i++) {
-                if(/header/.test(editor.getTokenTypeAt(CodeMirror.Pos(i, 0))) === false){
-                    fold(editor, CodeMirror.Pos(i, 0));
-                }
-            }
-        });
-        return CodeMirror.orgmode.destroy.bind(this, editor);
-    });
+	let widgets = [];
+	function toggleHandler(cm, e) {
+		const position = cm.coordsChar(
+				{
+					left: e.clientX || e.targetTouches?.[0].clientX,
+					top: e.clientY || e.targetTouches?.[0].clientY,
+				},
+				"page",
+			),
+			token = cm.getTokenAt(position);
 
-    CodeMirror.registerHelper("orgmode", "destroy", (editor) => {
-        editor.off('mousedown', toggleHandler);
-        editor.off('touchstart', toggleHandler);
-        editor.off('gutterClick', foldLine);
-    });
+		_disableSelection();
+		if (/org-level-star/.test(token.type)) {
+			_preventIfShould();
+			_foldHeadline();
+			_disableSelection();
+		} else if (/org-toggle/.test(token.type)) {
+			_preventIfShould();
+			_toggleCheckbox();
+			_disableSelection();
+		} else if (/org-todo/.test(token.type)) {
+			_preventIfShould();
+			_toggleTodo();
+			_disableSelection();
+		} else if (/org-done/.test(token.type)) {
+			_preventIfShould();
+			_toggleDone();
+			_disableSelection();
+		} else if (/org-priority/.test(token.type)) {
+			_preventIfShould();
+			_togglePriority();
+			_disableSelection();
+		} else if (/org-url/.test(token.type)) {
+			_disableSelection();
+			_navigateLink();
+		} else if (/org-image/.test(token.type)) {
+			_disableSelection();
+			_toggleImageWidget();
+		}
 
-    function foldLine(cm, line){
-        const cursor = {line: line, ch: 0};
-        isFold(cm, cursor) ? unfold(cm, cursor) : fold(cm, cursor);
-    }
+		function _preventIfShould() {
+			if ("ontouchstart" in window) e.preventDefault();
+		}
+		function _disableSelection() {
+			cm.on("beforeSelectionChange", _onSelectionChangeHandler);
+			function _onSelectionChangeHandler(cm, obj) {
+				obj.update([
+					{
+						anchor: position,
+						head: position,
+					},
+				]);
+				cm.off("beforeSelectionChange", _onSelectionChangeHandler);
+			}
+		}
 
+		function _foldHeadline() {
+			const line = position.line;
+			if (line >= 0) {
+				const cursor = { line: line, ch: 0 };
+				isFold(cm, cursor) ? unfold(cm, cursor) : fold(cm, cursor);
+			}
+		}
 
-    let widgets = [];
-    function toggleHandler(cm, e){
-        const position = cm.coordsChar({
-            left: e.clientX || (e.targetTouches && e.targetTouches[0].clientX),
-            top: e.clientY || (e.targetTouches && e.targetTouches[0].clientY)
-        }, "page"),
-              token = cm.getTokenAt(position);
+		function _toggleCheckbox() {
+			const line = position.line;
+			const current = cm.getRange(
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+			const next = cycleCheckboxState(current);
+			cm.replaceRange(
+				next,
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+		}
 
-        _disableSelection();
-        if(/org-level-star/.test(token.type)){
-            _preventIfShould();
-            _foldHeadline();
-            _disableSelection();
-        }else if(/org-toggle/.test(token.type)){
-            _preventIfShould();
-            _toggleCheckbox();
-            _disableSelection();
-        }else if(/org-todo/.test(token.type)){
-            _preventIfShould();
-            _toggleTodo();
-            _disableSelection();
-        }else if(/org-done/.test(token.type)){
-            _preventIfShould();
-            _toggleDone();
-            _disableSelection();
-        }else if(/org-priority/.test(token.type)){
-            _preventIfShould();
-            _togglePriority();
-            _disableSelection();
-        }else if(/org-url/.test(token.type)){
-            _disableSelection();
-            _navigateLink();
-        }else if(/org-image/.test(token.type)){
-            _disableSelection();
-            _toggleImageWidget();
-        }
+		function _toggleTodo() {
+			const line = position.line;
+			const keyword = cm.getRange(
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+			const config = getTodoConfig(cm);
+			const next = cycleKeyword(keyword, config.todo);
+			if (next) {
+				cm.replaceRange(
+					next,
+					{ line: line, ch: token.start },
+					{ line: line, ch: token.end },
+				);
+			}
+		}
 
-        function _preventIfShould(){
-            if('ontouchstart' in window) e.preventDefault();
-        }
-        function _disableSelection(){
-            cm.on('beforeSelectionChange', _onSelectionChangeHandler);
-            function _onSelectionChangeHandler(cm, obj){
-                obj.update([{
-                    anchor: position,
-                    head: position
-                }]);
-                cm.off('beforeSelectionChange', _onSelectionChangeHandler);
-            }
-        }
+		function _toggleDone() {
+			const line = position.line;
+			const keyword = cm.getRange(
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+			const config = getTodoConfig(cm);
+			const next = cycleKeyword(keyword, config.done);
+			if (next) {
+				cm.replaceRange(
+					next,
+					{ line: line, ch: token.start },
+					{ line: line, ch: token.end },
+				);
+			}
+		}
 
-        function _foldHeadline(){
-            const line = position.line;
-            if(line >= 0){
-                const cursor = {line: line, ch: 0};
-                isFold(cm, cursor) ? unfold(cm, cursor) : fold(cm, cursor);
-            }
-        }
+		function _togglePriority() {
+			const PRIORITIES = [" [#A] ", " [#B] ", " [#C] ", " [#A] "];
+			const line = position.line;
+			const content = cm.getRange(
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+			const new_content = PRIORITIES[PRIORITIES.indexOf(content) + 1];
+			cm.replaceRange(
+				new_content,
+				{ line: line, ch: token.start },
+				{ line: line, ch: token.end },
+			);
+		}
 
-        function _toggleCheckbox(){
-            const line = position.line;
-            const current = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
-            const next = cycleCheckboxState(current);
-            cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
-        }
+		function _toggleImageWidget() {
+			const exist = !!widgets.filter((line) => line === position.line)[0];
 
-        function _toggleTodo(){
-            const line = position.line;
-            const keyword = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
-            const config = getTodoConfig(cm);
-            const next = cycleKeyword(keyword, config.todo);
-            if(next){
-                cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
-            }
-        }
+			if (exist === false) {
+				if (!token.string.match(/\[\[(.*)\]\]/)) return null;
+				const $node = _buildImage(RegExp.$1);
+				const widget = cm.addLineWidget(position.line, $node, {
+					coverGutter: false,
+				});
+				widgets.push(position.line);
+				$node.addEventListener("click", closeWidget);
 
-        function _toggleDone(){
-            const line = position.line;
-            const keyword = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
-            const config = getTodoConfig(cm);
-            const next = cycleKeyword(keyword, config.done);
-            if(next){
-                cm.replaceRange(next, {line: line, ch: token.start}, {line: line, ch: token.end});
-            }
-        }
+				function closeWidget() {
+					widget.clear();
+					$node.removeEventListener("click", closeWidget);
+					widgets = widgets.filter((line) => line !== position.line);
+				}
+			}
+			function _buildImage(src) {
+				const $el = document.createElement("div");
+				const $img = document.createElement("img");
 
-        function _togglePriority(){
-            const PRIORITIES = [" [#A] ", " [#B] ", " [#C] ", " [#A] "];
-            const line = position.line;
-            const content = cm.getRange({line: line, ch: token.start}, {line: line, ch: token.end});
-            let new_content = PRIORITIES[PRIORITIES.indexOf(content) + 1];
-            cm.replaceRange(new_content, {line: line, ch: token.start}, {line: line, ch: token.end});
-        }
+				if (/^https?:\/\//.test(src)) {
+					$img.src = src;
+				} else {
+					const root_path = dirname(
+						window.location.pathname.replace(/^\/view/, ""),
+					);
+					const img_path = src;
+					$img.src =
+						"/api/files/cat?path=" +
+						encodeURIComponent(pathBuilder(root_path, img_path));
+				}
+				$el.appendChild($img);
+				return $el;
+			}
+			return null;
+		}
 
-        function _toggleImageWidget(){
-            let exist = !!widgets
-                .filter((line) => line === position.line)[0];
+		function _navigateLink() {
+			token.string.match(/\[\[(.*?)\]\[/);
+			const link = RegExp.$1;
+			if (!link) return;
 
-            if(exist === false){
-                if(!token.string.match(/\[\[(.*)\]\]/)) return null;
-                let $node = _buildImage(RegExp.$1);
-                const widget = cm.addLineWidget(position.line, $node, {coverGutter: false});
-                widgets.push(position.line);
-                $node.addEventListener('click', closeWidget);
+			if (/^https?:\/\//.test(link)) {
+				window.open(link);
+			} else {
+				const root_path = dirname(
+					window.location.pathname.replace(/^\/view/, ""),
+				);
+				const link_path = link;
+				window.open(`/view${pathBuilder(root_path, link_path)}`);
+			}
+		}
+	}
 
-                function closeWidget(){
-                    widget.clear();
-                    $node.removeEventListener('click', closeWidget);
-                    widgets = widgets.filter((line) => line !== position.line);
-                }
-            }
-            function _buildImage(src){
-                let $el = document.createElement("div");
-                let $img = document.createElement("img");
+	function org_cycle(cm) {
+		if (toggleHeadingFold(cm) === false) {
+			execDefaultTab(cm);
+		}
+	}
 
-                if(/^https?\:\/\//.test(src)){
-                    $img.src = src;
-                }else{
-                    const root_path = dirname(window.location.pathname.replace(/^\/view/, ''));
-                    const img_path = src;
-                    $img.src = "/api/files/cat?path="+encodeURIComponent(pathBuilder(root_path, img_path));
-                }
-                $el.appendChild($img);
-                return $el;
-            }
-            return null;
-        }
+	function org_shifttab(cm) {
+		if (!cm || typeof cm.lineCount !== "function") return;
+		const collapse = !cm.state.orgmodeHasCollapsedAll;
+		cm.operation(() => {
+			for (let i = 0; i < cm.lineCount(); i++) {
+				if (isHeaderLine(cm, i)) {
+					collapse
+						? fold(cm, { line: i, ch: 0 })
+						: unfold(cm, { line: i, ch: 0 });
+				}
+			}
+		});
+		cm.state.orgmodeHasCollapsedAll = collapse;
+	}
 
-        function _navigateLink(){
-            token.string.match(/\[\[(.*?)\]\[/);
-            const link = RegExp.$1;
-            if(!link) return;
+	function org_metaleft(cm) {
+		execCommand(cm, "indentLess");
+	}
 
-            if(/^https?\:\/\//.test(link)){
-                window.open(link);
-            }else{
-                const root_path = dirname(window.location.pathname.replace(/^\/view/, ''));
-                const link_path = link;
-                window.open("/view"+pathBuilder(root_path, link_path));
-            }
-        }
-    }
+	function org_metaright(cm) {
+		execCommand(cm, "indentMore");
+	}
 
-    function org_cycle(cm){
-        if(toggleHeadingFold(cm) === false){
-            execDefaultTab(cm);
-        }
-    }
+	function org_meta_return(cm) {
+		execCommand(cm, "newlineAndIndent");
+	}
 
-    function org_shifttab(cm){
-        if(!cm || typeof cm.lineCount !== "function") return;
-        const collapse = !cm.state.orgmodeHasCollapsedAll;
-        cm.operation(function(){
-            for(var i = 0; i < cm.lineCount(); i++){
-                if(isHeaderLine(cm, i)){
-                    collapse ? fold(cm, {line: i, ch: 0}) : unfold(cm, {line: i, ch: 0});
-                }
-            }
-        });
-        cm.state.orgmodeHasCollapsedAll = collapse;
-    }
+	function org_metaup(cm) {
+		execCommand(cm, "swapLineUp");
+	}
 
-    function org_metaleft(cm){
-        execCommand(cm, "indentLess");
-    }
+	function org_metadown(cm) {
+		execCommand(cm, "swapLineDown");
+	}
 
-    function org_metaright(cm){
-        execCommand(cm, "indentMore");
-    }
+	function org_shiftmetaleft(cm) {
+		execCommand(cm, "indentLess");
+	}
 
-    function org_meta_return(cm){
-        execCommand(cm, "newlineAndIndent");
-    }
+	function org_shiftmetaright(cm) {
+		execCommand(cm, "indentMore");
+	}
 
-    function org_metaup(cm){
-        execCommand(cm, "swapLineUp");
-    }
+	function org_insert_todo_heading(cm) {
+		if (!cm) return;
+		const cursor = cm.getCursor();
+		const level = getHeadingLevel(cm, cursor.line) || 1;
+		const stars = new Array(level + 1).join("*");
+		const heading = `${stars} TODO `;
+		const insertion = `\n${heading}`;
+		cm.replaceRange(insertion, cursor);
+		cm.setCursor({ line: cursor.line + 1, ch: heading.length });
+	}
 
-    function org_metadown(cm){
-        execCommand(cm, "swapLineDown");
-    }
+	function org_shiftleft(cm) {
+		execCommand(cm, "indentLess");
+	}
 
-    function org_shiftmetaleft(cm){
-        execCommand(cm, "indentLess");
-    }
+	function org_shiftright(cm) {
+		execCommand(cm, "indentMore");
+	}
 
-    function org_shiftmetaright(cm){
-        execCommand(cm, "indentMore");
-    }
+	function toggleHeadingFold(cm) {
+		if (!cm) return false;
+		const cursor = cm.getCursor();
+		const line = cursor.line;
+		if (isHeaderLine(cm, line) === false) return false;
+		const pos = { line: line, ch: 0 };
+		if (isFold(cm, pos)) {
+			unfold(cm, pos);
+		} else {
+			fold(cm, pos);
+		}
+		return true;
+	}
 
-    function org_insert_todo_heading(cm){
-        if(!cm) return;
-        const cursor = cm.getCursor();
-        const level = getHeadingLevel(cm, cursor.line) || 1;
-        const stars = new Array(level + 1).join("*");
-        const insertion = "\n" + stars + " TODO ";
-        cm.replaceRange(insertion, cursor);
-        cm.setCursor({line: cursor.line + 1, ch: (stars + " TODO ").length});
-    }
+	function execDefaultTab(cm) {
+		if (!cm) return;
+		if (cm.execCommand) {
+			cm.execCommand("defaultTab");
+		} else {
+			cm.replaceSelection("\t");
+		}
+	}
 
-    function org_shiftleft(cm){
-        execCommand(cm, "indentLess");
-    }
+	function execCommand(cm, command, fallback) {
+		if (!cm) return;
+		if (CodeMirror.commands?.[command]) {
+			CodeMirror.commands[command](cm);
+		} else if (typeof fallback === "function") {
+			fallback();
+		}
+	}
 
-    function org_shiftright(cm){
-        execCommand(cm, "indentMore");
-    }
+	function getHeadingLevel(cm, line) {
+		if (line == null || line < 0 || line >= cm.lineCount()) return null;
+		const text = cm.getLine(line);
+		const match = text?.match(/^(\*+)/);
+		if (match) return match[1].length;
+		return null;
+	}
 
-    function toggleHeadingFold(cm){
-        if(!cm) return false;
-        const cursor = cm.getCursor();
-        const line = cursor.line;
-        if(isHeaderLine(cm, line) === false) return false;
-        const pos = {line: line, ch: 0};
-        if(isFold(cm, pos)){
-            unfold(cm, pos);
-        }else{
-            fold(cm, pos);
-        }
-        return true;
-    }
+	function isHeaderLine(cm, line) {
+		if (line == null || line < 0 || line >= cm.lineCount()) return false;
+		const tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, 0)) || "";
+		return /header/.test(tokenType);
+	}
 
-    function execDefaultTab(cm){
-        if(!cm) return;
-        if(cm.execCommand){
-            cm.execCommand("defaultTab");
-        }else{
-            cm.replaceSelection("\t");
-        }
-    }
+	function normalizeCursor(cursor) {
+		if (cursor == null) return CodeMirror.Pos(0, 0);
+		if (typeof cursor.line === "number") {
+			return CodeMirror.Pos(cursor.line, cursor.ch || 0);
+		}
+		if (typeof cursor === "number") {
+			return CodeMirror.Pos(cursor, 0);
+		}
+		return CodeMirror.Pos(0, 0);
+	}
 
-    function execCommand(cm, command, fallback){
-        if(!cm) return;
-        if(CodeMirror.commands && CodeMirror.commands[command]){
-            CodeMirror.commands[command](cm);
-        }else if(typeof fallback === "function"){
-            fallback();
-        }
-    }
+	function hasFoldSupport(cm) {
+		return !!(cm && typeof cm.foldCode === "function");
+	}
 
-    function getHeadingLevel(cm, line){
-        if(line == null || line < 0 || line >= cm.lineCount()) return null;
-        const text = cm.getLine(line);
-        const match = text && text.match(/^(\*+)/);
-        if(match) return match[1].length;
-        return null;
-    }
+	function fold(cm, cursor) {
+		if (!hasFoldSupport(cm)) return;
+		const pos = normalizeCursor(cursor);
+		cm.foldCode(pos, null, "fold");
+	}
 
-    function isHeaderLine(cm, line){
-        if(line == null || line < 0 || line >= cm.lineCount()) return false;
-        const tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, 0)) || "";
-        return /header/.test(tokenType);
-    }
+	function unfold(cm, cursor) {
+		if (!hasFoldSupport(cm)) return;
+		const pos = normalizeCursor(cursor);
+		cm.foldCode(pos, null, "unfold");
+	}
 
-    function normalizeCursor(cursor){
-        if(cursor == null) return CodeMirror.Pos(0, 0);
-        if(typeof cursor.line === "number"){
-            return CodeMirror.Pos(cursor.line, cursor.ch || 0);
-        }
-        if(typeof cursor === "number"){
-            return CodeMirror.Pos(cursor, 0);
-        }
-        return CodeMirror.Pos(0, 0);
-    }
+	function isFold(cm, cursor) {
+		if (!cm || typeof cm.findMarksAt !== "function") return false;
+		const pos = normalizeCursor(cursor);
+		const marks = cm.findMarksAt(pos) || [];
+		for (let i = 0; i < marks.length; i++) {
+			if (marks[i].__isFold) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-    function hasFoldSupport(cm){
-        return !!(cm && typeof cm.foldCode === "function");
-    }
+	function cycleKeyword(current, list) {
+		if (!list || list.length === 0) return current;
+		const idx = list.indexOf(current);
+		if (idx === -1) {
+			return list[0];
+		}
+		const nextIndex = (idx + 1) % list.length;
+		return list[nextIndex];
+	}
 
-    function fold(cm, cursor){
-        if(!hasFoldSupport(cm)) return;
-        const pos = normalizeCursor(cursor);
-        cm.foldCode(pos, null, "fold");
-    }
+	function getTodoConfig(cm) {
+		return (
+			parseSeqTodo(cm) || {
+				todo: DEFAULT_TODO_KEYWORDS.slice(0),
+				done: DEFAULT_DONE_KEYWORDS.slice(0),
+			}
+		);
+	}
 
-    function unfold(cm, cursor){
-        if(!hasFoldSupport(cm)) return;
-        const pos = normalizeCursor(cursor);
-        cm.foldCode(pos, null, "unfold");
-    }
+	function parseSeqTodo(cm) {
+		if (!cm || typeof cm.lineCount !== "function") return null;
+		for (let i = 0; i < cm.lineCount(); i++) {
+			const line = cm.getLine(i);
+			if (!line || line.charAt(0) !== "#") continue;
+			const match = line.match(/^\s*#\+SEQ_TODO:\s*(.+)$/i);
+			if (!match) continue;
+			const spec = match[1];
+			const sections = spec.split("|");
+			let undone = extractKeywords(sections[0]);
+			let done = [];
+			for (let s = 1; s < sections.length; s++) {
+				done = done.concat(extractKeywords(sections[s]));
+			}
+			if (done.length === 0) done = DEFAULT_DONE_KEYWORDS.slice(0);
+			if (undone.length === 0) undone = DEFAULT_TODO_KEYWORDS.slice(0);
+			return {
+				todo: uniquePreserveOrder(undone),
+				done: uniquePreserveOrder(done),
+			};
+		}
+		return null;
+	}
 
-    function isFold(cm, cursor){
-        if(!cm || typeof cm.findMarksAt !== "function") return false;
-        const pos = normalizeCursor(cursor);
-        const marks = cm.findMarksAt(pos) || [];
-        for(var i = 0; i < marks.length; i++){
-            if(marks[i].__isFold){
-                return true;
-            }
-        }
-        return false;
-    }
+	function extractKeywords(section) {
+		if (!section) return [];
+		return section
+			.trim()
+			.split(/\s+/)
+			.map((word) => word.replace(/\(.*?\)/g, "").trim())
+			.filter(Boolean);
+	}
 
-    function cycleKeyword(current, list){
-        if(!list || list.length === 0) return current;
-        const idx = list.indexOf(current);
-        if(idx === -1){
-            return list[0];
-        }
-        const nextIndex = (idx + 1) % list.length;
-        return list[nextIndex];
-    }
+	function uniquePreserveOrder(list) {
+		var seen = {};
+		var result = [];
+		for (let i = 0; i < list.length; i++) {
+			const key = list[i];
+			if (!seen[key]) {
+				seen[key] = true;
+				result.push(key);
+			}
+		}
+		return result;
+	}
 
-    function getTodoConfig(cm){
-        return parseSeqTodo(cm) || {
-            todo: DEFAULT_TODO_KEYWORDS.slice(0),
-            done: DEFAULT_DONE_KEYWORDS.slice(0)
-        };
-    }
+	function cycleCheckboxState(value) {
+		var normalized = (value || "").toUpperCase();
+		var order = ["[ ]", "[X]", "[-]"];
+		var index = order.indexOf(normalized);
+		if (index === -1) {
+			return "[X]";
+		}
+		var next = order[(index + 1) % order.length];
+		if (value && value.charAt(1) === "x" && next === "[X]") {
+			return "[x]";
+		}
+		return next;
+	}
 
-    function parseSeqTodo(cm){
-        if(!cm || typeof cm.lineCount !== "function") return null;
-        for(var i = 0; i < cm.lineCount(); i++){
-            var line = cm.getLine(i);
-            if(!line || line.charAt(0) !== "#") continue;
-            var match = line.match(/^\s*#\+SEQ_TODO:\s*(.+)$/i);
-            if(!match) continue;
-            var spec = match[1];
-            var sections = spec.split("|");
-            var undone = extractKeywords(sections[0]);
-            var done = [];
-            for(var s = 1; s < sections.length; s++){
-                done = done.concat(extractKeywords(sections[s]));
-            }
-            if(done.length === 0) done = DEFAULT_DONE_KEYWORDS.slice(0);
-            if(undone.length === 0) undone = DEFAULT_TODO_KEYWORDS.slice(0);
-            return {todo: uniquePreserveOrder(undone), done: uniquePreserveOrder(done)};
-        }
-        return null;
-    }
+	function dirname(pathname) {
+		if (typeof pathname !== "string" || pathname.length === 0) return "/";
+		var normalized = pathname.replace(/\\/g, "/");
+		normalized = normalized.replace(/\/+$/, "");
+		if (normalized === "") return "/";
+		var idx = normalized.lastIndexOf("/");
+		if (idx <= 0) return "/";
+		return normalized.slice(0, idx);
+	}
 
-    function extractKeywords(section){
-        if(!section) return [];
-        return section.trim().split(/\s+/).map(function(word){
-            return word.replace(/\(.*?\)/g, "").trim();
-        }).filter(Boolean);
-    }
+	function pathBuilder(root, relative) {
+		var stack = [];
+		function pushParts(parts) {
+			for (let i = 0; i < parts.length; i++) {
+				const part = parts[i];
+				if (!part || part === ".") continue;
+				if (part === "..") {
+					if (stack.length) stack.pop();
+				} else {
+					stack.push(part);
+				}
+			}
+		}
+		var base = (root || "").replace(/\\/g, "/").split("/");
+		var rel = (relative || "").replace(/\\/g, "/").split("/");
+		pushParts(base);
+		pushParts(rel);
+		return `/${stack.join("/")}`;
+	}
 
-    function uniquePreserveOrder(list){
-        var seen = {};
-        var result = [];
-        for(var i = 0; i < list.length; i++){
-            var key = list[i];
-            if(!seen[key]){
-                seen[key] = true;
-                result.push(key);
-            }
-        }
-        return result;
-    }
-
-    function cycleCheckboxState(value){
-        var normalized = (value || "").toUpperCase();
-        var order = ["[ ]", "[X]", "[-]"];
-        var index = order.indexOf(normalized);
-        if(index === -1){
-            return "[X]";
-        }
-        var next = order[(index + 1) % order.length];
-        if(value && value.charAt(1) === "x" && next === "[X]"){
-            return "[x]";
-        }
-        return next;
-    }
-
-    function dirname(pathname){
-        if(typeof pathname !== "string" || pathname.length === 0) return "/";
-        var normalized = pathname.replace(/\\/g, "/");
-        normalized = normalized.replace(/\/+$/, "");
-        if(normalized === "") return "/";
-        var idx = normalized.lastIndexOf("/");
-        if(idx <= 0) return "/";
-        return normalized.slice(0, idx);
-    }
-
-    function pathBuilder(root, relative){
-        var stack = [];
-        function pushParts(parts){
-            for(var i = 0; i < parts.length; i++){
-                var part = parts[i];
-                if(!part || part === ".") continue;
-                if(part === ".."){
-                    if(stack.length) stack.pop();
-                }else{
-                    stack.push(part);
-                }
-            }
-        }
-        var base = (root || "").replace(/\\/g, "/").split("/");
-        var rel = (relative || "").replace(/\\/g, "/").split("/");
-        pushParts(base);
-        pushParts(rel);
-        return "/" + stack.join("/");
-    }
-
-    CodeMirror.defineMIME("text/org", "org");
+	CodeMirror.defineMIME("text/org", "org");
 });

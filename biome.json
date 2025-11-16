@@ -1,0 +1,16 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.5/schema.json",
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true
+		}
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": ["src/main.ts", "src/mode/orgmode/**/*.js", "!!**/main.js"]
+	},
+	"formatter": {
+		"enabled": true
+	}
+}
