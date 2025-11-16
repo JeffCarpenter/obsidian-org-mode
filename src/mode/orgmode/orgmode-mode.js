@@ -103,9 +103,10 @@
 
 
     CodeMirror.registerHelper("orgmode", "init", (editor, fn) => {
+        const registerHelperCallback = typeof fn === "function" ? fn : () => {};
         editor.setOption("extraKeys", {
             "Tab": function(cm) { org_cycle(cm); },
-            "Shift-Tab": function(cm){ fn('shifttab', org_shifttab(cm)); },
+            "Shift-Tab": function(cm){ org_shifttab(cm); },
             "Alt-Left": function(cm){ org_metaleft(cm); },
             "Alt-Right": function(cm){ org_metaright(cm); },
             "Alt-Enter": function(cm){ org_meta_return(cm); },
@@ -117,7 +118,7 @@
             "Shift-Left": function(cm){ org_shiftleft(cm); },
             "Shift-Right": function(cm){ org_shiftright(cm); }
         });
-        fn('shifttab', org_set_fold(editor));
+        registerHelperCallback('shifttab', function() { org_shifttab(editor); });
 
         editor.on('mousedown', toggleHandler);
         editor.on('touchstart', toggleHandler);
@@ -277,6 +278,156 @@
                 window.open("/view"+pathBuilder(root_path, link_path));
             }
         }
+    }
+
+    function org_cycle(cm){
+        if(toggleHeadingFold(cm) === false){
+            execDefaultTab(cm);
+        }
+    }
+
+    function org_shifttab(cm){
+        if(!cm || typeof cm.lineCount !== "function") return;
+        const collapse = !cm.state.orgmodeHasCollapsedAll;
+        cm.operation(function(){
+            for(var i = 0; i < cm.lineCount(); i++){
+                if(isHeaderLine(cm, i)){
+                    collapse ? fold(cm, {line: i, ch: 0}) : unfold(cm, {line: i, ch: 0});
+                }
+            }
+        });
+        cm.state.orgmodeHasCollapsedAll = collapse;
+    }
+
+    function org_metaleft(cm){
+        execCommand(cm, "indentLess");
+    }
+
+    function org_metaright(cm){
+        execCommand(cm, "indentMore");
+    }
+
+    function org_meta_return(cm){
+        execCommand(cm, "newlineAndIndent");
+    }
+
+    function org_metaup(cm){
+        execCommand(cm, "swapLineUp");
+    }
+
+    function org_metadown(cm){
+        execCommand(cm, "swapLineDown");
+    }
+
+    function org_shiftmetaleft(cm){
+        execCommand(cm, "indentLess");
+    }
+
+    function org_shiftmetaright(cm){
+        execCommand(cm, "indentMore");
+    }
+
+    function org_insert_todo_heading(cm){
+        if(!cm) return;
+        const cursor = cm.getCursor();
+        const level = getHeadingLevel(cm, cursor.line) || 1;
+        const stars = new Array(level + 1).join("*");
+        const insertion = "\n" + stars + " TODO ";
+        cm.replaceRange(insertion, cursor);
+        cm.setCursor({line: cursor.line + 1, ch: (stars + " TODO ").length});
+    }
+
+    function org_shiftleft(cm){
+        execCommand(cm, "indentLess");
+    }
+
+    function org_shiftright(cm){
+        execCommand(cm, "indentMore");
+    }
+
+    function toggleHeadingFold(cm){
+        if(!cm) return false;
+        const cursor = cm.getCursor();
+        const line = cursor.line;
+        if(isHeaderLine(cm, line) === false) return false;
+        const pos = {line: line, ch: 0};
+        if(isFold(cm, pos)){
+            unfold(cm, pos);
+        }else{
+            fold(cm, pos);
+        }
+        return true;
+    }
+
+    function execDefaultTab(cm){
+        if(!cm) return;
+        if(cm.execCommand){
+            cm.execCommand("defaultTab");
+        }else{
+            cm.replaceSelection("\t");
+        }
+    }
+
+    function execCommand(cm, command, fallback){
+        if(!cm) return;
+        if(CodeMirror.commands && CodeMirror.commands[command]){
+            CodeMirror.commands[command](cm);
+        }else if(typeof fallback === "function"){
+            fallback();
+        }
+    }
+
+    function getHeadingLevel(cm, line){
+        if(line == null || line < 0 || line >= cm.lineCount()) return null;
+        const text = cm.getLine(line);
+        const match = text && text.match(/^(\*+)/);
+        if(match) return match[1].length;
+        return null;
+    }
+
+    function isHeaderLine(cm, line){
+        if(line == null || line < 0 || line >= cm.lineCount()) return false;
+        const tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, 0)) || "";
+        return /header/.test(tokenType);
+    }
+
+    function normalizeCursor(cursor){
+        if(cursor == null) return CodeMirror.Pos(0, 0);
+        if(typeof cursor.line === "number"){
+            return CodeMirror.Pos(cursor.line, cursor.ch || 0);
+        }
+        if(typeof cursor === "number"){
+            return CodeMirror.Pos(cursor, 0);
+        }
+        return CodeMirror.Pos(0, 0);
+    }
+
+    function hasFoldSupport(cm){
+        return !!(cm && typeof cm.foldCode === "function");
+    }
+
+    function fold(cm, cursor){
+        if(!hasFoldSupport(cm)) return;
+        const pos = normalizeCursor(cursor);
+        cm.foldCode(pos, null, "fold");
+    }
+
+    function unfold(cm, cursor){
+        if(!hasFoldSupport(cm)) return;
+        const pos = normalizeCursor(cursor);
+        cm.foldCode(pos, null, "unfold");
+    }
+
+    function isFold(cm, cursor){
+        if(!cm || typeof cm.findMarksAt !== "function") return false;
+        const pos = normalizeCursor(cursor);
+        const marks = cm.findMarksAt(pos) || [];
+        for(var i = 0; i < marks.length; i++){
+            if(marks[i].__isFold){
+                return true;
+            }
+        }
+        return false;
     }
 
     CodeMirror.defineMIME("text/org", "org");
