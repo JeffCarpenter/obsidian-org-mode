@@ -608,6 +608,7 @@ const {
 			parseSeqTodo,
 			toggleHandler,
 			foldLine,
+			org_insert_todo_heading,
 		};
 	}
 

@@ -83,6 +83,10 @@ function loadOrgmodeModeModule() {
     return exportsValue || {};
 }
 
+function getTestingHelpers() {
+    return loadOrgmodeModeModule().__orgmodeTesting;
+}
+
 describe("orgmode CodeMirror integration", () => {
     let codeMirrorStub;
 
@@ -197,15 +201,13 @@ describe("orgmode CodeMirror integration", () => {
     });
 
     test("cycleKeyword helper rotates entries", () => {
-        const mod = loadOrgmodeModeModule();
-        const helpers = mod.__orgmodeTesting;
+        const helpers = getTestingHelpers();
         expect(helpers.cycleKeyword("A", ["A", "B", "C"])).toBe("B");
         expect(helpers.cycleKeyword("C", ["A", "B", "C"])).toBe("A");
     });
 
     test("getTodoConfig returns parsed keyword sets", () => {
-        const mod = loadOrgmodeModeModule();
-        const helpers = mod.__orgmodeTesting;
+        const helpers = getTestingHelpers();
         const cm = {
             lineCount: () => 1,
             getLine: () => "#+SEQ_TODO: TODO NEXT | DONE",
@@ -217,10 +219,18 @@ describe("orgmode CodeMirror integration", () => {
         });
     });
 
-    test("toggleHandler toggles checkbox and prevents selection", () => {
-        const mod = loadOrgmodeModeModule();
-        const { toggleHandler } = mod.__orgmodeTesting;
+    test("getTodoConfig falls back to defaults", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            lineCount: () => 0,
+        };
+        const config = helpers.getTodoConfig(cm);
+        expect(config.todo).toContain("TODO");
+        expect(config.done).toContain("DONE");
+    });
 
+    test("toggleHandler toggles checkbox and prevents selection", () => {
+        const { toggleHandler } = getTestingHelpers();
         const cm = createCmForToken({
             type: "org-toggle",
             start: 0,
@@ -238,8 +248,7 @@ describe("orgmode CodeMirror integration", () => {
     });
 
     test("toggleHandler opens relative link when clicking org-url", () => {
-        const mod = loadOrgmodeModeModule();
-        const { toggleHandler } = mod.__orgmodeTesting;
+        const { toggleHandler } = getTestingHelpers();
         const cm = createCmForToken({
             type: "org-url",
             start: 0,
@@ -251,9 +260,21 @@ describe("orgmode CodeMirror integration", () => {
         expect(global.window.open).toHaveBeenCalledWith("/view/root/next");
     });
 
+    test("toggleHandler opens http URL directly", () => {
+        const { toggleHandler } = getTestingHelpers();
+        const cm = createCmForToken({
+            type: "org-url",
+            start: 0,
+            end: 10,
+            string: "[[https://example.com][Example]]",
+        });
+
+        toggleHandler(cm, { clientX: 1, clientY: 1 });
+        expect(global.window.open).toHaveBeenCalledWith("https://example.com");
+    });
+
     test("toggleHandler cycles TODO and DONE keywords", () => {
-        const mod = loadOrgmodeModeModule();
-        const { toggleHandler } = mod.__orgmodeTesting;
+        const { toggleHandler } = getTestingHelpers();
         const todoCm = createCmForToken({
             type: "org-todo",
             start: 0,
@@ -282,8 +303,7 @@ describe("orgmode CodeMirror integration", () => {
     });
 
     test("toggleHandler advances priority tokens", () => {
-        const mod = loadOrgmodeModeModule();
-        const { toggleHandler } = mod.__orgmodeTesting;
+        const { toggleHandler } = getTestingHelpers();
         const cm = createCmForToken({
             type: "org-priority",
             start: 0,
@@ -295,6 +315,64 @@ describe("orgmode CodeMirror integration", () => {
             " [#B] ",
             { line: 0, ch: 0 },
             { line: 0, ch: 6 },
+        );
+    });
+    test("toggleHandler renders inline image widgets once per line", () => {
+        const { toggleHandler } = getTestingHelpers();
+        const cm = createCmForToken({
+            type: "org-image",
+            start: 0,
+            end: 5,
+            string: "[[images/pic.png]]",
+            line: 3,
+        }, {
+            addLineWidget: jest.fn(() => ({ clear: jest.fn() })),
+        });
+
+        toggleHandler(cm, { clientX: 2, clientY: 2 });
+        toggleHandler(cm, { clientX: 2, clientY: 2 });
+        expect(cm.addLineWidget).toHaveBeenCalledTimes(1);
+    });
+
+    test("org_insert_todo_heading creates heading below current level", () => {
+        const helpers = getTestingHelpers();
+        const cm = {
+            getCursor: () => ({ line: 1, ch: 0 }),
+            getLine: (line) => (line === 1 ? "** Heading" : "* Root"),
+            getTokenTypeAt: () => "header",
+            replaceRange: jest.fn(),
+            setCursor: jest.fn(),
+            lineCount: () => 2,
+        };
+        helpers.org_insert_todo_heading(cm);
+
+        const [text, from, to] = cm.replaceRange.mock.calls[0];
+        expect(text).toBe("\n** TODO ");
+        expect(from).toEqual({ line: 1, ch: 0 });
+        expect(cm.setCursor).toHaveBeenCalledWith({ line: 2, ch: 8 });
+    });
+
+    test("foldLine folds when no mark exists", () => {
+        const { foldLine } = getTestingHelpers();
+        const cm = {
+            findMarksAt: jest.fn(() => []),
+            foldCode: jest.fn(),
+        };
+        foldLine(cm, 5);
+        expect(cm.foldCode).toHaveBeenCalledWith({ line: 5, ch: 0 }, null, "fold");
+    });
+
+    test("foldLine unfolds when mark already exists", () => {
+        const { foldLine } = getTestingHelpers();
+        const cm = {
+            findMarksAt: jest.fn(() => [{ __isFold: true }]),
+            foldCode: jest.fn(),
+        };
+        foldLine(cm, 2);
+        expect(cm.foldCode).toHaveBeenCalledWith(
+            { line: 2, ch: 0 },
+            null,
+            "unfold",
         );
     });
 });
