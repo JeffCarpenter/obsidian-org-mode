@@ -2,3 +2,6 @@
 * DONE Wire CodeMirror org helper in OrgView
   CLOSED: [2025-11-16]
   Ensured each view calls the registered orgmode helper and tears it down so folding/toggle logic actually executes.
+* DONE Replace browser-only path helpers
+  CLOSED: [2025-11-16]
+  `_toggleImageWidget`/`_navigateLink` now use local path utilities so image/link toggles no longer throw when dirname/pathBuilder are missing.

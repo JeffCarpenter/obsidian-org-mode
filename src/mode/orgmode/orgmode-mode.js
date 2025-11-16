@@ -430,5 +430,35 @@
         return false;
     }
 
+    function dirname(pathname){
+        if(typeof pathname !== "string" || pathname.length === 0) return "/";
+        var normalized = pathname.replace(/\\/g, "/");
+        normalized = normalized.replace(/\/+$/, "");
+        if(normalized === "") return "/";
+        var idx = normalized.lastIndexOf("/");
+        if(idx <= 0) return "/";
+        return normalized.slice(0, idx);
+    }
+
+    function pathBuilder(root, relative){
+        var stack = [];
+        function pushParts(parts){
+            for(var i = 0; i < parts.length; i++){
+                var part = parts[i];
+                if(!part || part === ".") continue;
+                if(part === ".."){
+                    if(stack.length) stack.pop();
+                }else{
+                    stack.push(part);
+                }
+            }
+        }
+        var base = (root || "").replace(/\\/g, "/").split("/");
+        var rel = (relative || "").replace(/\\/g, "/").split("/");
+        pushParts(base);
+        pushParts(rel);
+        return "/" + stack.join("/");
+    }
+
     CodeMirror.defineMIME("text/org", "org");
 });
