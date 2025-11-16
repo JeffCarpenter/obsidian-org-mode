@@ -1,0 +1,40 @@
+#+TITLE: Code Review: obsidian-org-mode
+#+DATE: 2025-11-16
+#+AUTHOR: Codex (GPT-5)
+#+FILETAGS: :code_review:obsidian:orgmode:
+#+PROPERTY: repo obsidian-org-mode
+#+PROPERTY: path D:/code/fork/obsidian-org-mode
+
+* Summary
+  The current org-mode integration instantiates CodeMirror without the helper hooks it registers, and the helper itself references several undefined functions and browser-only utilities. As shipped, the view throws at startup, Tab/Shift-Tab break, and clicking on TODOs, checkboxes, or links raises runtime errors. Critical folding logic never runs, so even if the errors were fixed the intended behaviors are still inert.
+
+* Findings
+** Critical Undeclared keybinding targets
+   - File :: src/mode/orgmode/orgmode-mode.js:107-118
+   - Description :: The =extraKeys= config invokes ~org_cycle~, ~org_shifttab~, ~org_metaleft~, etc., but none of these functions exist anywhere in the repo (ripgrep only reports these call sites). Pressing any of these keys will raise a ReferenceError before CodeMirror handles the event, disabling normal editor navigation.
+   - Recommendation :: Vendor/import the upstream org command implementations or swap to CodeMirror’s built-in commands (e.g., =foldCode=, custom commands bound via =cm.addKeyMap=) until proper handlers exist.
+** Critical Missing folding helpers
+   - File :: src/mode/orgmode/orgmode-mode.js:120-145,204
+   - Description :: The init routine eagerly calls ~org_set_fold~, ~fold~, ~unfold~, and ~isFold~, none of which are defined. The very first call inside the =editor.operation= loop therefore throws and prevents the plugin from finishing =onload=, leaking listeners and leaving the editor half-initialised.
+   - Recommendation :: Either import the expected folding helpers or rework the logic to use =cm.foldCode= / =CodeMirror.commands.toggleFold= with explicit guards so initialisation cannot throw.
+** High Undefined path utilities in click handler
+   - File :: src/mode/orgmode/orgmode-mode.js:257-277
+   - Description :: =_toggleImageWidget= and =_navigateLink= call ~dirname~ and ~pathBuilder~, which are undefined in this code base. Clicking image or link tokens throws immediately, meaning the checkbox/todo handler never completes and selection stays disabled.
+   - Recommendation :: Implement the missing helpers (e.g., use Node’s =path.posix= or Obsidian’s =normalizePath=) or remove the non-Obsidian URL munging; ensure errors are caught so checkbox toggles remain reliable.
+** High Helper never initialised
+   - File :: src/main.ts:34-69
+   - Description :: =OrgView= constructs a bare CodeMirror editor and never calls the helper registered via =CodeMirror.registerHelper("orgmode", "init", …)=, so even if the missing functions were present none of the folding/toggle logic would run.
+   - Recommendation :: After instantiating CodeMirror, call =CodeMirror.helpers.orgmode.init(codeMirror, …)= (or define an option that does so automatically) and ensure =destroy= runs during =onunload=.
+** Medium TODO/checkbox toggles overwrite user state
+   - File :: src/mode/orgmode/orgmode-mode.js:218-247
+   - Description :: The handlers hard-code checkbox states to =[ ]= and =[X]= and replace every TODO keyword with literal "DONE" or "TODO", ignoring user-defined sequences like NEXT, WAITING, etc. This violates org-mode semantics and can corrupt user notes.
+   - Recommendation :: Read the actual keyword list from the regex captures or plugin configuration and cycle within that list; preserve casing and unexpected tokens by leaving unknown values untouched.
+
+* Open Questions
+  1. Were the ~org_*~ helper functions intentionally omitted (e.g., expected from upstream CodeMirror org mode)? If so, we need to vendor them or remove the bindings.
+  2. The link/image handlers reference =/api/files/cat= and =/view= URLs that look like a different web app. Are these behaviors even relevant for Obsidian vaults? Clarification would help scope the fix.
+
+* Next Steps
+  1. Restore or replace the missing helper implementations and folding commands.
+  2. Wire the helper initialisation/destroy cycle into =OrgView= so CodeMirror actually receives the custom behavior.
+  3. Replace browser-only path handling with Obsidian-aware utilities and guard checkbox/TODO toggles so they respect user-defined keywords.
